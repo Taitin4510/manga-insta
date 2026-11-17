@@ -25,9 +25,10 @@ Actions タブ → ワークフローを選ぶ → Run workflow。
 
 ## CSV の列
 
-`kind,title,genre,catch,tag1,tag2,tag3,point1,point2,point3,synopsis,author,publisher,volumes,caption`
+`kind,title,genre,catch,tag1,tag2,tag3,point1,point2,point3,synopsis,author,publisher,volumes,caption,badge`
 
 - `kind`: `manga`（漫画）または `goods`（雑貨）
+- `badge`: 表紙の赤いバッジ（10文字まで）。「1巻無料」「アニメ放送中」など確認できた事実だけ。空欄なら出ない
 - 雑貨のとき: `author`=ブランド、`publisher`=ショップ、`volumes`=価格の目安、`synopsis`=商品の説明
 
 ## 注意

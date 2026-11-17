@@ -16,6 +16,7 @@ WHITE = (255, 255, 255)
 GRAY = (68, 68, 68)
 ACCENT = (255, 212, 59)   # #FFD43B
 GROUND = (91, 155, 213)   # #5B9BD5
+BADGE = (200, 30, 45)     # バッジの赤（白文字とのコントラスト確保）
 
 FONT_DIR = os.environ.get("FONT_DIR", "/usr/share/fonts/opentype/noto")
 FONT_FILES = {
@@ -91,6 +92,13 @@ def draw_cover(w):
     rr(d, (cx + 16, cy + 16, cx + 16 + cw, cy + 16 + ch), 32, fill=INK)
     rr(d, (cx, cy, cx + cw, cy + ch), 32, fill=WHITE, outline=INK, width=6)
     inner_x, inner_w = cx + 64, cw - 128
+    badge = (w.get("badge") or "").strip()[:10]
+    if badge:  # 「1巻無料」「セール中」など、確認できた事実だけ入る
+        bf = font("black", 40)
+        bw = text_w(bf, badge) + 64
+        bx1 = cx + cw + 10
+        rr(d, (bx1 - bw, cy - 34, bx1, cy + 50), 42, fill=BADGE, outline=INK, width=5)
+        text_mid(d, bx1 - bw / 2, cy + 8, badge, bf, WHITE, "mm")
 
     size = 112
     while True:
@@ -160,7 +168,7 @@ def draw_points(w):
 
     cta_y, cta_h = 1170, 108
     rr(d, (72, cta_y, 72 + 936, cta_y + cta_h), 54, fill=ACCENT, outline=INK, width=6)
-    text_mid(d, W / 2, cta_y + cta_h / 2, "続きはプロフィールのリンクから", font("black", 40), INK, "mm")
+    text_mid(d, W / 2, cta_y + cta_h / 2, "プロフのリンクから今すぐチェック", font("black", 40), INK, "mm")
 
     sy = py + ph + 32
     sh = cta_y - 32 - sy
@@ -274,11 +282,11 @@ def main(path, force=False):
         cover, points = draw_cover(w), draw_points(w)
         cover.save(os.path.join(out, f"{i}_1.jpg"), "JPEG", quality=92)
         points.save(os.path.join(out, f"{i}_2.jpg"), "JPEG", quality=92)
-        frame_916(cover, "NEW POST", "続きはプロフのリンクから").save(
+        frame_916(cover, (w.get("badge") or "NEW POST").strip()[:10], "プロフのリンクからチェック").save(
             os.path.join(out, f"{i}_story.jpg"), "JPEG", quality=92)
         lb = labels(w)
         make_reel([frame_916(cover, lb["pill"], lb["points"] + "は次へ"),
-                   frame_916(points, lb["pill"], "続きはプロフのリンクから")],
+                   frame_916(points, lb["pill"], "プロフのリンクからチェック")],
                   os.path.join(out, f"{i}_reel.mp4"), out, seed=f"{day}-{i}")
     print(f"{day}: {len(works)}作品ぶんの画像を作成")
 
