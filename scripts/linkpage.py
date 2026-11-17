@@ -28,6 +28,15 @@ def pixel(prog):
     return f"https://i.moshimo.com/af/i/impression?{q}"
 
 
+def target_url(w):
+    """CSVの url 列に楽天のページがあればそれを、なければ楽天の検索結果を使う"""
+    u = (w.get("url") or "").strip()
+    host = urllib.parse.urlparse(u).netloc.lower()
+    if u.startswith("https://") and (host == "rakuten.co.jp" or host.endswith(".rakuten.co.jp")):
+        return u
+    return rakuten_search(w)
+
+
 def rakuten_search(w):
     goods = (w.get("kind") or "").strip().lower() in ("goods", "雑貨", "item")
     kw = w.get("title", "").strip()
@@ -52,7 +61,7 @@ def card(i, w):
     goods = (w.get("kind") or "").strip().lower() in ("goods", "雑貨", "item")
     badge = f'<span class="badge">{e(w.get("badge"))}</span>' if (w.get("badge") or "").strip() else ""
     kind = "雑貨" if goods else "漫画"
-    link = moshimo(rakuten_search(w), CONFIG["rakuten"])
+    link = moshimo(target_url(w), CONFIG["rakuten"])
     return f'''<li class="card">
   <div class="top"><span class="num">{i}</span><span class="kind">{kind}</span>{badge}</div>
   <h3>{e(w.get("title"))}</h3>

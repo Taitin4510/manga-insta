@@ -25,9 +25,10 @@ Actions タブ → ワークフローを選ぶ → Run workflow。
 
 ## CSV の列
 
-`kind,title,genre,catch,tag1,tag2,tag3,point1,point2,point3,synopsis,author,publisher,volumes,caption,badge`
+`kind,title,genre,catch,tag1,tag2,tag3,point1,point2,point3,synopsis,author,publisher,volumes,caption,badge,url`
 
 - `kind`: `manga`（漫画）または `goods`（雑貨）
+- `url`: 楽天市場・楽天ブックスの商品ページURL（任意）。あればまとめページのボタンが直接そのページへ、なければ楽天の検索結果へ飛ぶ
 - `badge`: 表紙の赤いバッジ（10文字まで）。「1巻無料」「アニメ放送中」など確認できた事実だけ。空欄なら出ない
 - 雑貨のとき: `author`=ブランド、`publisher`=ショップ、`volumes`=価格の目安、`synopsis`=商品の説明
 
