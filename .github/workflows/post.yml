@@ -15,6 +15,11 @@ on:
     - cron: "7 12 * * *"
     - cron: "7 13 * * *"
   workflow_dispatch:
+    inputs:
+      only:
+        description: "投稿する種類だけにしぼる（feed / story / reel をカンマ区切り。空なら全部）"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -32,6 +37,7 @@ jobs:
         env:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          ONLY_KINDS: ${{ github.event.inputs.only }}
         run: python scripts/post.py
       - name: 投稿記録を保存する
         if: always()

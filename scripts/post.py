@@ -158,7 +158,9 @@ def main():
 
     log_path = f"posted/{day}.json"
     log = load_log(log_path)
-    todo = [i for i in range(1, len(works) + 1) if any(i not in log[k] for k in KINDS)]
+    only = [k.strip() for k in os.environ.get("ONLY_KINDS", "").split(",") if k.strip() in KINDS]
+    kinds = only or list(KINDS)
+    todo = [i for i in range(1, len(works) + 1) if any(i not in log[k] for k in kinds)]
     if not todo:
         print("今日のぶんは全部投稿ずみ")
         return
@@ -186,18 +188,18 @@ def main():
             errors.append(f"{kind}: {e}")
             print(f"{kind} の投稿に失敗: {e}")
 
-    if i not in log["feed"]:
+    if "feed" in kinds and i not in log["feed"]:
         urls = [f"{base}/{i}_1.jpg", f"{base}/{i}_2.jpg"]
         if not all(check_url(u) for u in urls):
             raise SystemExit(f"画像がまだ公開されていません: {urls}")
         attempt("feed", lambda: post_feed(uid, urls, caption))
-    if i not in log["story"]:
+    if "story" in kinds and i not in log["story"]:
         u = f"{base}/{i}_story.jpg"
         if check_url(u):
             attempt("story", lambda: post_story(uid, u))
         else:
             errors.append(f"story: 画像がありません {u}")
-    if i not in log["reel"]:
+    if "reel" in kinds and i not in log["reel"]:
         v = f"images/{day}/{i}_reel.mp4"
         if os.path.exists(v):
             attempt("reel", lambda: post_reel(uid, v, caption))
