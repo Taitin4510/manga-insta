@@ -15,7 +15,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-API = "https://graph.instagram.com/" + os.environ.get("GRAPH_VERSION", "v23.0")
+API = "https://graph.instagram.com/" + os.environ.get("GRAPH_VERSION", "v27.0")
 JST = dt.timezone(dt.timedelta(hours=9))
 
 
