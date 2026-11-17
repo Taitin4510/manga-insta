@@ -50,7 +50,7 @@ def wait_ready(container_id):
     raise SystemExit(f"コンテナの処理がタイムアウト: {container_id}")
 
 
-def caption_of(w):
+def caption_of(w, n=None):
     tags = " ".join("#" + t.strip().lstrip("#") for t in (w.get("tag1"), w.get("tag2"), w.get("tag3")) if t and t.strip())
     goods = (w.get("kind") or "").strip().lower() in ("goods", "雑貨", "item")
     head = w.get("caption") or f"{w.get('title', '')}\n{w.get('catch', '')}"
@@ -63,7 +63,7 @@ def caption_of(w):
         "",
         *[f"✔️{w.get(k).strip()}" for k in ("point1", "point2", "point3") if (w.get(k) or "").strip()],
         "",
-        "気になったらプロフのリンクからチェックしてね" + ("🛍️" if goods else "📚"),
+        (f"気になったらプロフのリンクの【{n}番】をチェックしてね" if n else "気になったらプロフのリンクからチェックしてね") + ("🛍️" if goods else "📚"),
         "🔖あとで見返せるように保存しておくのがおすすめ",
         ("💬使ってみたい人はコメントで教えて！" if goods else "💬読んだことある人はコメントで教えて！"),
         "",
@@ -173,7 +173,7 @@ def main():
 
     repo = os.environ["GITHUB_REPOSITORY"]
     base = f"https://raw.githubusercontent.com/{repo}/main/images/{day}"
-    caption = caption_of(w)
+    caption = caption_of(w, i)
     errors = []
 
     def attempt(kind, fn):

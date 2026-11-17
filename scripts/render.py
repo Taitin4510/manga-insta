@@ -282,11 +282,11 @@ def main(path, force=False):
         cover, points = draw_cover(w), draw_points(w)
         cover.save(os.path.join(out, f"{i}_1.jpg"), "JPEG", quality=92)
         points.save(os.path.join(out, f"{i}_2.jpg"), "JPEG", quality=92)
-        frame_916(cover, (w.get("badge") or "NEW POST").strip()[:10], "プロフのリンクからチェック").save(
+        frame_916(cover, (w.get("badge") or "NEW POST").strip()[:10], f"プロフのリンクの{i}番をチェック").save(
             os.path.join(out, f"{i}_story.jpg"), "JPEG", quality=92)
         lb = labels(w)
         make_reel([frame_916(cover, lb["pill"], lb["points"] + "は次へ"),
-                   frame_916(points, lb["pill"], "プロフのリンクからチェック")],
+                   frame_916(points, lb["pill"], f"プロフのリンクの{i}番をチェック")],
                   os.path.join(out, f"{i}_reel.mp4"), out, seed=f"{day}-{i}")
     print(f"{day}: {len(works)}作品ぶんの画像を作成")
 
