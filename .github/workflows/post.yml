@@ -1,0 +1,36 @@
+name: インスタに投稿
+
+on:
+  schedule:
+    # 日本時間 8:07 / 12:07 / 18:07 / 20:07 / 22:07（GitHubは数分〜数十分遅れることがあるよ）
+    - cron: "7 23 * * *"
+    - cron: "7 3 * * *"
+    - cron: "7 9 * * *"
+    - cron: "7 11 * * *"
+    - cron: "7 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repo-write
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 1件投稿する
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+        run: python scripts/post.py
+      - name: 投稿記録を保存する
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add posted || true
+          git diff --cached --quiet || git commit -m "投稿記録を更新"
+          git pull --rebase
+          git push

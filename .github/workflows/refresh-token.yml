@@ -1,0 +1,25 @@
+name: アクセストークンを更新
+
+# 長期トークンの期限は約60日。毎週月曜に更新して、Secrets を新しいトークンに差しかえる。
+# Secrets に GH_PAT（このリポジトリの Secrets を書きかえられる fine-grained トークン）が必要。
+on:
+  schedule:
+    - cron: "17 1 * * 1"
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: トークンを更新して保存
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          set -e
+          resp=$(curl -sS "https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${IG_ACCESS_TOKEN}")
+          new=$(echo "$resp" | python -c "import sys,json;print(json.load(sys.stdin).get('access_token',''))")
+          if [ -z "$new" ]; then echo "更新に失敗しました（トークンの期限切れかも）"; exit 1; fi
+          echo "::add-mask::$new"
+          gh secret set IG_ACCESS_TOKEN --repo "$GITHUB_REPOSITORY" --body "$new"
+          echo "トークンを更新しました"
