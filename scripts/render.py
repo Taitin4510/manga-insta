@@ -81,7 +81,7 @@ def draw_cover(w):
     img = Image.new("RGB", (W, H), GROUND)
     d = ImageDraw.Draw(img)
     f = font("black", 34)
-    label = "今日のおすすめ漫画"
+    label = labels(w)["pill"]
     pw = text_w(f, label) + 56
     rr(d, (72, 72, 72 + pw, 136), 32, fill=INK)
     text_mid(d, 100, 104, label, f, ACCENT)
@@ -127,7 +127,7 @@ def draw_cover(w):
         text_mid(d, tx + 26, y + 30, lab, gf, INK)
         tx += tw + 16
 
-    text_mid(d, 72, 1253, "推しポイントはスワイプ", font("black", 34), INK)
+    text_mid(d, 72, 1253, labels(w)["swipe"], font("black", 34), INK)
     d.line((W - 140, 1253, W - 80, 1253), fill=INK, width=6)
     d.line((W - 98, 1237, W - 80, 1253, W - 98, 1269), fill=INK, width=6, joint="curve")
     return img
@@ -136,7 +136,7 @@ def draw_cover(w):
 def draw_points(w):
     img = Image.new("RGB", (W, H), GROUND)
     d = ImageDraw.Draw(img)
-    d.text((72, 120), "推しポイント", font=font("black", 72), fill=WHITE,
+    d.text((72, 120), labels(w)["points"], font=font("black", 72), fill=WHITE,
            stroke_width=4, stroke_fill=INK, anchor="lm")
     pr_box(d, W - 72, 94)
 
@@ -165,7 +165,7 @@ def draw_points(w):
     sy = py + ph + 32
     sh = cta_y - 32 - sy
     rr(d, (72, sy, 72 + 936, sy + sh), 28, fill=WHITE, outline=INK, width=6)
-    text_mid(d, 120, sy + 56, "あらすじ", font("black", 32), INK)
+    text_mid(d, 120, sy + 56, labels(w)["about"], font("black", 32), INK)
     room = sh - 56 - 40 - 80
     size = 34
     while True:
@@ -176,9 +176,12 @@ def draw_points(w):
         size -= 2
     for i, l in enumerate(lines):
         text_mid(d, 120, sy + 110 + size * 1.6 * i, l, sf, INK)
-    parts = [(lab, w.get(k, "")) for lab, k in (("作者", "author"), ("出版社", "publisher"), ("既刊", "volumes"))]
+    parts = [(lab, w.get(k, "")) for lab, k in labels(w)["info"]]
     info = "　".join(f"{lab}：{v}" for lab, v in parts if v)
-    text_mid(d, 120, sy + sh - 44, info, font("bold", 26), GRAY)
+    isz = 26
+    while text_w(font("bold", isz), info) > 840 and isz > 18:
+        isz -= 1
+    text_mid(d, 120, sy + sh - 44, info, font("bold", isz), GRAY)
     return img
 
 
@@ -232,6 +235,20 @@ def make_reel(frames, out_path, tmp_dir, sec=4, fade=0.6, seed="bgm"):
         os.remove(p)
 
 
+def is_goods(w):
+    return (w.get("kind") or "").strip().lower() in ("goods", "雑貨", "item")
+
+
+def labels(w):
+    if is_goods(w):
+        return {"pill": "今日のおすすめ雑貨", "swipe": "おすすめポイントはスワイプ", "points": "おすすめポイント",
+                "about": "どんな商品？",
+                "info": (("ブランド", "author"), ("ショップ", "publisher"), ("価格の目安", "volumes"))}
+    return {"pill": "今日のおすすめ漫画", "swipe": "推しポイントはスワイプ", "points": "推しポイント",
+            "about": "あらすじ",
+            "info": (("作者", "author"), ("出版社", "publisher"), ("既刊", "volumes"))}
+
+
 def read_csv(path):
     with open(path, encoding="utf-8-sig", newline="") as f:
         return [r for r in csv.DictReader(f) if (r.get("title") or "").strip()]
@@ -259,8 +276,9 @@ def main(path, force=False):
         points.save(os.path.join(out, f"{i}_2.jpg"), "JPEG", quality=92)
         frame_916(cover, "NEW POST", "続きはプロフのリンクから").save(
             os.path.join(out, f"{i}_story.jpg"), "JPEG", quality=92)
-        make_reel([frame_916(cover, "今日のおすすめ漫画", "推しポイントは次へ"),
-                   frame_916(points, "今日のおすすめ漫画", "続きはプロフのリンクから")],
+        lb = labels(w)
+        make_reel([frame_916(cover, lb["pill"], lb["points"] + "は次へ"),
+                   frame_916(points, lb["pill"], "続きはプロフのリンクから")],
                   os.path.join(out, f"{i}_reel.mp4"), out, seed=f"{day}-{i}")
     print(f"{day}: {len(works)}作品ぶんの画像を作成")
 

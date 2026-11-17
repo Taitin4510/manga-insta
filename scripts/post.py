@@ -52,16 +52,17 @@ def wait_ready(container_id):
 
 def caption_of(w):
     tags = " ".join("#" + t.strip().lstrip("#") for t in (w.get("tag1"), w.get("tag2"), w.get("tag3")) if t and t.strip())
+    goods = (w.get("kind") or "").strip().lower() in ("goods", "雑貨", "item")
     head = w.get("caption") or f"{w.get('title', '')}\n{w.get('catch', '')}"
     lines = [
         head,
         "",
-        f"📚『{w.get('title', '')}』",
+        f"{'🛍️' if goods else '📚'}『{w.get('title', '')}』",
         f"「{w.get('catch', '')}」",
         "",
-        "続きはプロフィールのリンクから📚",
+        "続きはプロフィールのリンクから" + ("🛍️" if goods else "📚"),
         "",
-        f"#PR #漫画紹介 #おすすめ漫画 {tags}".strip(),
+        (f"#PR #おすすめ雑貨 #便利グッズ {tags}" if goods else f"#PR #漫画紹介 #おすすめ漫画 {tags}").strip(),
     ]
     return "\n".join(lines)
 

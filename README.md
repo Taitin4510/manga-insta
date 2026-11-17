@@ -1,12 +1,12 @@
 # manga-insta
 
-話題の漫画を、文字だけの紹介画像（2枚スワイプ）で毎日インスタに自動投稿するしくみ。漫画のページ画像は使わない。
+話題の漫画5作品と雑貨5商品を、文字だけの紹介画像（2枚スワイプ）・ストーリー・リール（オリジナルBGMつき）で毎日インスタに自動投稿するしくみ。漫画のページ画像や商品写真は使わない。
 
 ## 流れ
 
-1. 毎朝 6:12（日本時間）、Claude が `drafts/manga_YYYY-MM-DD.csv` に5作品ぶんの下書きを置く
-2. `画像をつくる` ワークフローが `images/YYYY-MM-DD/` に JPEG を作る
-3. `インスタに投稿` ワークフローが 8:07 / 12:07 / 18:07 / 20:07 / 22:07 に1件ずつ投稿する
+1. 毎朝 6:12（日本時間）、Claude が `drafts/manga_YYYY-MM-DD.csv` に10件（本と雑貨が交互）の下書きを置く
+2. `画像をつくる` ワークフローが `images/YYYY-MM-DD/` に投稿画像・ストーリー画像・リール動画を作る
+3. `インスタに投稿` ワークフローが 7:07〜22:07 の10回、1件ずつ（投稿＋ストーリー＋リール）投稿する
    投稿ずみの番号は `posted/YYYY-MM-DD.json` に記録される
 
 ## 最初の設定
@@ -25,7 +25,10 @@ Actions タブ → ワークフローを選ぶ → Run workflow。
 
 ## CSV の列
 
-`title,genre,catch,tag1,tag2,tag3,point1,point2,point3,synopsis,author,publisher,volumes,caption`
+`kind,title,genre,catch,tag1,tag2,tag3,point1,point2,point3,synopsis,author,publisher,volumes,caption`
+
+- `kind`: `manga`（漫画）または `goods`（雑貨）
+- 雑貨のとき: `author`=ブランド、`publisher`=ショップ、`volumes`=価格の目安、`synopsis`=商品の説明
 
 ## 注意
 
