@@ -16,7 +16,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-API = os.environ.get("GRAPH_HOST", "https://graph.facebook.com") + "/" + os.environ.get("GRAPH_VERSION", "v27.0")
+_TOKEN = os.environ.get("IG_ACCESS_TOKEN", "")
+# IGAA… で始まるのはインスタ用トークン（graph.instagram.com）、それ以外は Facebook 系（graph.facebook.com）
+_DEFAULT_HOST = "https://graph.instagram.com" if _TOKEN.startswith("IG") else "https://graph.facebook.com"
+API = os.environ.get("GRAPH_HOST", _DEFAULT_HOST) + "/" + os.environ.get("GRAPH_VERSION", "v27.0")
 JST = dt.timezone(dt.timedelta(hours=9))
 
 
@@ -94,6 +97,8 @@ def main():
             raise SystemExit(f"画像がまだ公開されていません: {u}")
 
     uid = os.environ.get("IG_USER_ID", "").strip()
+    if not uid and "graph.instagram.com" in API:
+        uid = str(call("GET", "me", fields="user_id")["user_id"])
     if not uid:
         raise SystemExit("IG_USER_ID が設定されていません（GitHub Secrets を確認してね）")
     children = []
