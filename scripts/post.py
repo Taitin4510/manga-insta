@@ -66,6 +66,81 @@ def caption_of(w):
     return "\n".join(lines)
 
 
+KINDS = ("feed", "story", "reel")
+
+
+def load_log(path):
+    if not os.path.exists(path):
+        return {k: [] for k in KINDS}
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    if isinstance(data, list):  # 旧形式（フィード投稿だけの記録）
+        data = {"feed": data}
+    return {k: list(data.get(k, [])) for k in KINDS}
+
+
+def save_log(path, log):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({k: sorted(v) for k, v in log.items()}, f)
+
+
+def check_url(u):
+    try:
+        urllib.request.urlopen(urllib.request.Request(u, method="HEAD"), timeout=30)
+        return True
+    except urllib.error.URLError:
+        return False
+
+
+def post_feed(uid, urls, caption):
+    children = []
+    for u in urls:
+        c = call("POST", f"{uid}/media", image_url=u, is_carousel_item="true")["id"]
+        wait_ready(c)
+        children.append(c)
+    carousel = call("POST", f"{uid}/media", media_type="CAROUSEL",
+                    children=",".join(children), caption=caption)["id"]
+    wait_ready(carousel)
+    return call("POST", f"{uid}/media_publish", creation_id=carousel).get("id")
+
+
+def post_story(uid, url):
+    c = call("POST", f"{uid}/media", media_type="STORIES", image_url=url)["id"]
+    wait_ready(c)
+    return call("POST", f"{uid}/media_publish", creation_id=c).get("id")
+
+
+def post_reel(uid, video_path, caption):
+    """動画ファイルを直接アップロード（resumable upload）してリールを投稿する"""
+    res = call("POST", f"{uid}/media", media_type="REELS", upload_type="resumable",
+               caption=caption, share_to_feed="false")
+    cid = res["id"]
+    upload_uri = res.get("uri") or f"https://rupload.facebook.com/ig-api-upload/{API.rsplit('/', 1)[1]}/{cid}"
+    with open(video_path, "rb") as f:
+        body = f.read()
+    req = urllib.request.Request(upload_uri, data=body, method="POST", headers={
+        "Authorization": f"OAuth {os.environ['IG_ACCESS_TOKEN']}",
+        "offset": "0",
+        "file_size": str(len(body)),
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=300) as r:
+            r.read()
+    except urllib.error.HTTPError as e:
+        raise SystemExit(f"動画アップロードに失敗 {e.code}: {e.read().decode(errors='replace')}")
+    for _ in range(60):  # 動画は処理に時間がかかる（最大5分待つ）
+        st = call("GET", cid, fields="status_code").get("status_code")
+        if st == "FINISHED":
+            break
+        if st in ("ERROR", "EXPIRED"):
+            raise SystemExit(f"リールの処理に失敗: {st}")
+        time.sleep(5)
+    else:
+        raise SystemExit("リールの処理がタイムアウト")
+    return call("POST", f"{uid}/media_publish", creation_id=cid).get("id")
+
+
 def main():
     day = os.environ.get("POST_DATE") or dt.datetime.now(JST).strftime("%Y-%m-%d")
     csv_path = f"drafts/manga_{day}.csv"
@@ -76,46 +151,54 @@ def main():
         works = [r for r in csv.DictReader(f) if (r.get("title") or "").strip()]
 
     log_path = f"posted/{day}.json"
-    posted = []
-    if os.path.exists(log_path):
-        with open(log_path, encoding="utf-8") as f:
-            posted = json.load(f)
-    todo = [i for i in range(1, len(works) + 1) if i not in posted]
+    log = load_log(log_path)
+    todo = [i for i in range(1, len(works) + 1) if any(i not in log[k] for k in KINDS)]
     if not todo:
         print("今日のぶんは全部投稿ずみ")
         return
     i = todo[0]
     w = {k: (v or "").strip() for k, v in works[i - 1].items()}
 
-    repo = os.environ["GITHUB_REPOSITORY"]
-    base = f"https://raw.githubusercontent.com/{repo}/main/images/{day}"
-    urls = [f"{base}/{i}_1.jpg", f"{base}/{i}_2.jpg"]
-    for u in urls:
-        try:
-            urllib.request.urlopen(urllib.request.Request(u, method="HEAD"), timeout=30)
-        except urllib.error.URLError:
-            raise SystemExit(f"画像がまだ公開されていません: {u}")
-
     uid = os.environ.get("IG_USER_ID", "").strip()
     if not uid and "graph.instagram.com" in API:
         uid = str(call("GET", "me", fields="user_id")["user_id"])
     if not uid:
         raise SystemExit("IG_USER_ID が設定されていません（GitHub Secrets を確認してね）")
-    children = []
-    for u in urls:
-        c = call("POST", f"{uid}/media", image_url=u, is_carousel_item="true")["id"]
-        wait_ready(c)
-        children.append(c)
-    carousel = call("POST", f"{uid}/media", media_type="CAROUSEL",
-                    children=",".join(children), caption=caption_of(w))["id"]
-    wait_ready(carousel)
-    media = call("POST", f"{uid}/media_publish", creation_id=carousel)
-    print(f"投稿しました: {i}. {w.get('title')} (media id {media.get('id')})")
 
-    os.makedirs("posted", exist_ok=True)
-    posted.append(i)
-    with open(log_path, "w", encoding="utf-8") as f:
-        json.dump(sorted(posted), f)
+    repo = os.environ["GITHUB_REPOSITORY"]
+    base = f"https://raw.githubusercontent.com/{repo}/main/images/{day}"
+    caption = caption_of(w)
+    errors = []
+
+    def attempt(kind, fn):
+        try:
+            mid = fn()
+            log[kind].append(i)
+            save_log(log_path, log)
+            print(f"{kind} を投稿しました: {i}. {w.get('title')} (media id {mid})")
+        except SystemExit as e:
+            errors.append(f"{kind}: {e}")
+            print(f"{kind} の投稿に失敗: {e}")
+
+    if i not in log["feed"]:
+        urls = [f"{base}/{i}_1.jpg", f"{base}/{i}_2.jpg"]
+        if not all(check_url(u) for u in urls):
+            raise SystemExit(f"画像がまだ公開されていません: {urls}")
+        attempt("feed", lambda: post_feed(uid, urls, caption))
+    if i not in log["story"]:
+        u = f"{base}/{i}_story.jpg"
+        if check_url(u):
+            attempt("story", lambda: post_story(uid, u))
+        else:
+            errors.append(f"story: 画像がありません {u}")
+    if i not in log["reel"]:
+        v = f"images/{day}/{i}_reel.mp4"
+        if os.path.exists(v):
+            attempt("reel", lambda: post_reel(uid, v, caption))
+        else:
+            errors.append(f"reel: 動画がありません {v}")
+    if errors:
+        raise SystemExit("一部の投稿に失敗しました:\n" + "\n".join(errors))
 
 
 if __name__ == "__main__":

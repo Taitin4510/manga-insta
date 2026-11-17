@@ -182,6 +182,53 @@ def draw_points(w):
     return img
 
 
+SW, SH = 1080, 1920  # ストーリー・リール（9:16）
+
+
+def frame_916(post_img, top_label, bottom_label):
+    """1080x1350 の投稿画像を 9:16 の枠に入れる"""
+    img = Image.new("RGB", (SW, SH), GROUND)
+    d = ImageDraw.Draw(img)
+    f = font("black", 44)
+    w = text_w(f, top_label) + 72
+    rr(d, ((SW - w) / 2, 120, (SW + w) / 2, 210), 45, fill=INK)
+    text_mid(d, SW / 2, 165, top_label, f, ACCENT, "mm")
+    s = post_img.resize((1000, 1250))
+    img.paste(s, (40, 290))
+    rr(d, (40, 290, 1040, 1540), 8, outline=INK, width=6)
+    bf = font("black", 50)
+    rr(d, (90, 1640, SW - 90, 1760), 60, fill=ACCENT, outline=INK, width=6)
+    text_mid(d, SW / 2, 1700, bottom_label, bf, INK, "mm")
+    return img
+
+
+def make_reel(frames, out_path, tmp_dir, sec=4, fade=0.6):
+    """静止画を順番にクロスフェードでつないだ無音のリール動画（H.264 / AAC）を作る"""
+    import subprocess
+    paths = []
+    for n, fr in enumerate(frames):
+        p = os.path.join(tmp_dir, f"_reel_{n}.jpg")
+        fr.save(p, "JPEG", quality=92)
+        paths.append(p)
+    cmd = ["ffmpeg", "-y", "-loglevel", "error"]
+    for p in paths:
+        cmd += ["-loop", "1", "-t", str(sec), "-i", p]
+    total = sec * len(paths) - fade * (len(paths) - 1)
+    cmd += ["-f", "lavfi", "-t", f"{total:.2f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
+    chain, last = [], "[0:v]"
+    for k in range(1, len(paths)):
+        out = f"[v{k}]"
+        chain.append(f"{last}[{k}:v]xfade=transition=fade:duration={fade}:offset={sec * k - fade * k:.2f}{out}")
+        last = out
+    chain.append(f"{last}format=yuv420p,fps=30[vout]")
+    cmd += ["-filter_complex", ";".join(chain), "-map", "[vout]", "-map", f"{len(paths)}:a",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-profile:v", "high",
+            "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-shortest", out_path]
+    subprocess.run(cmd, check=True)
+    for p in paths:
+        os.remove(p)
+
+
 def read_csv(path):
     with open(path, encoding="utf-8-sig", newline="") as f:
         return [r for r in csv.DictReader(f) if (r.get("title") or "").strip()]
@@ -194,18 +241,28 @@ def date_of(path):
     return m.group(1)
 
 
-def main(path):
+def main(path, force=False):
     day = date_of(path)
     out = os.path.join("images", day)
+    if os.path.exists(os.path.join(out, "1_reel.mp4")) and not force:
+        print(f"{day}: 作成ずみなのでスキップ")
+        return
     os.makedirs(out, exist_ok=True)
     works = read_csv(path)
     for i, w in enumerate(works, 1):
         w = {k: (v or "").strip() for k, v in w.items()}
-        draw_cover(w).save(os.path.join(out, f"{i}_1.jpg"), "JPEG", quality=92)
-        draw_points(w).save(os.path.join(out, f"{i}_2.jpg"), "JPEG", quality=92)
+        cover, points = draw_cover(w), draw_points(w)
+        cover.save(os.path.join(out, f"{i}_1.jpg"), "JPEG", quality=92)
+        points.save(os.path.join(out, f"{i}_2.jpg"), "JPEG", quality=92)
+        frame_916(cover, "NEW POST", "続きはプロフのリンクから").save(
+            os.path.join(out, f"{i}_story.jpg"), "JPEG", quality=92)
+        make_reel([frame_916(cover, "今日のおすすめ漫画", "推しポイントは次へ"),
+                   frame_916(points, "今日のおすすめ漫画", "続きはプロフのリンクから")],
+                  os.path.join(out, f"{i}_reel.mp4"), out)
     print(f"{day}: {len(works)}作品ぶんの画像を作成")
 
 
 if __name__ == "__main__":
-    for p in sys.argv[1:]:
-        main(p)
+    args = [a for a in sys.argv[1:] if a != "--force"]
+    for p in args:
+        main(p, force="--force" in sys.argv)
