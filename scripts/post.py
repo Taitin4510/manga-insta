@@ -2,7 +2,8 @@
 
 GitHub Actions から1日5回呼ばれる想定。投稿済みの番号は posted/YYYY-MM-DD.json に記録する。
 必要な環境変数:
-  IG_ACCESS_TOKEN    Instagram API with Instagram Login の長期アクセストークン（GitHub Secrets）
+  IG_ACCESS_TOKEN    システムユーザーのアクセストークン（統合ログイン / 無期限。GitHub Secrets）
+  IG_USER_ID         投稿先インスタアカウントのID（GitHub Secrets）
   GITHUB_REPOSITORY  例: Taitin4510/manga-insta（Actions が自動で入れる）
 """
 import csv
@@ -15,7 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-API = "https://graph.instagram.com/" + os.environ.get("GRAPH_VERSION", "v27.0")
+API = os.environ.get("GRAPH_HOST", "https://graph.facebook.com") + "/" + os.environ.get("GRAPH_VERSION", "v27.0")
 JST = dt.timezone(dt.timedelta(hours=9))
 
 
@@ -92,7 +93,9 @@ def main():
         except urllib.error.URLError:
             raise SystemExit(f"画像がまだ公開されていません: {u}")
 
-    uid = call("GET", "me", fields="user_id,username")["user_id"]
+    uid = os.environ.get("IG_USER_ID", "").strip()
+    if not uid:
+        raise SystemExit("IG_USER_ID が設定されていません（GitHub Secrets を確認してね）")
     children = []
     for u in urls:
         c = call("POST", f"{uid}/media", image_url=u, is_carousel_item="true")["id"]

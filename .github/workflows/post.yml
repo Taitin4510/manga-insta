@@ -25,6 +25,7 @@ jobs:
       - name: 1件投稿する
         env:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
         run: python scripts/post.py
       - name: 投稿記録を保存する
         run: |

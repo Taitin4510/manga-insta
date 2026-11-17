@@ -13,8 +13,8 @@
 
 | Secrets の名前 | 中身 |
 | --- | --- |
-| `IG_ACCESS_TOKEN` | Instagram API with Instagram Login の長期アクセストークン |
-| `GH_PAT` | このリポジトリの Secrets を書きかえられる fine-grained トークン（トークン自動更新用） |
+| `IG_ACCESS_TOKEN` | Meta アプリの統合ログインで作ったシステムユーザーアクセストークン（無期限） |
+| `IG_USER_ID` | 投稿先インスタアカウントのID（ビジネス設定 → Instagramアカウント で確認） |
 
 Settings → Secrets and variables → Actions → New repository secret で登録する。
 トークンはチャットやファイルには絶対に書かない。
