@@ -10,39 +10,56 @@ import os
 import re
 import urllib.parse
 
-CONFIG = {
-    "a_id": "5907781",  # もしもアフィリエイトの紹介ID（公開リンクに含まれるもの）
-    # 楽天市場の商品購入（どこでもリンク）
-    "rakuten": {"p_id": "54", "pc_id": "54", "pl_id": "616"},
+# もしもアフィリエイトの「どこでもリンク」の番号（案件ごとに a_id がちがう）
+PROGRAMS = {
+    "rakuten": {"a_id": "5907781", "p_id": "54", "pc_id": "54", "pl_id": "616"},        # 楽天市場
+    "rakuten_books": {"a_id": "5907787", "p_id": "56", "pc_id": "56", "pl_id": "637"},  # 楽天ブックス
+    "amazon": None,  # Amazon（番号がわかったら入れる）
 }
 DAYS = 7
 
 
 def moshimo(url, prog):
-    q = urllib.parse.urlencode({"a_id": CONFIG["a_id"], **prog, "url": url})
+    q = urllib.parse.urlencode({**prog, "url": url})
     return f"https://af.moshimo.com/af/c/click?{q}"
 
 
 def pixel(prog):
-    q = urllib.parse.urlencode({"a_id": CONFIG["a_id"], **prog})
+    q = urllib.parse.urlencode(prog)
     return f"https://i.moshimo.com/af/i/impression?{q}"
 
 
-def target_url(w):
-    """CSVの url 列に楽天のページがあればそれを、なければ楽天の検索結果を使う"""
-    u = (w.get("url") or "").strip()
+def is_goods(w):
+    return (w.get("kind") or "").strip().lower() in ("goods", "雑貨", "item")
+
+
+def host_ok(u, *domains):
     host = urllib.parse.urlparse(u).netloc.lower()
-    if u.startswith("https://") and (host == "rakuten.co.jp" or host.endswith(".rakuten.co.jp")):
-        return u
-    return rakuten_search(w)
+    return u.startswith("https://") and any(host == d or host.endswith("." + d) for d in domains)
 
 
-def rakuten_search(w):
-    goods = (w.get("kind") or "").strip().lower() in ("goods", "雑貨", "item")
+def rakuten_link(w):
+    """漫画は楽天ブックス、雑貨は楽天市場。CSVのurlがあればその商品ページ、なければ検索結果"""
+    u = (w.get("url") or "").strip()
+    title = w.get("title", "").strip()
+    if is_goods(w):
+        if not host_ok(u, "rakuten.co.jp") or host_ok(u, "books.rakuten.co.jp"):
+            u = f"https://search.rakuten.co.jp/search/mall/{urllib.parse.quote(title)}/"
+        return moshimo(u, PROGRAMS["rakuten"])
+    if host_ok(u, "books.rakuten.co.jp"):
+        return moshimo(u, PROGRAMS["rakuten_books"])
+    if host_ok(u, "rakuten.co.jp"):
+        return moshimo(u, PROGRAMS["rakuten"])
+    u = "https://books.rakuten.co.jp/search?" + urllib.parse.urlencode({"sitem": title, "g": "001001"})
+    return moshimo(u, PROGRAMS["rakuten_books"])
+
+
+def amazon_link(w):
+    if not PROGRAMS.get("amazon"):
+        return None
     kw = w.get("title", "").strip()
-    if not goods:
-        kw += " 漫画"
-    return f"https://search.rakuten.co.jp/search/mall/{urllib.parse.quote(kw)}/"
+    u = "https://www.amazon.co.jp/s?" + urllib.parse.urlencode({"k": kw, **({"i": "stripbooks"} if not is_goods(w) else {})})
+    return moshimo(u, PROGRAMS["amazon"])
 
 
 def load_days():
@@ -58,15 +75,19 @@ def load_days():
 
 def card(i, w):
     e = lambda s: html.escape((s or "").strip())
-    goods = (w.get("kind") or "").strip().lower() in ("goods", "雑貨", "item")
+    goods = is_goods(w)
     badge = f'<span class="badge">{e(w.get("badge"))}</span>' if (w.get("badge") or "").strip() else ""
     kind = "雑貨" if goods else "漫画"
-    link = moshimo(target_url(w), CONFIG["rakuten"])
+    attrs = 'rel="nofollow sponsored noopener" referrerpolicy="no-referrer-when-downgrade" target="_blank"'
+    btns = [f'<a class="btn" href="{html.escape(rakuten_link(w))}" {attrs}>{"楽天市場" if goods else "楽天ブックス"}でチェック</a>']
+    am = amazon_link(w)
+    if am:
+        btns.append(f'<a class="btn sub" href="{html.escape(am)}" {attrs}>Amazonでチェック</a>')
     return f'''<li class="card">
   <div class="top"><span class="num">{i}</span><span class="kind">{kind}</span>{badge}</div>
   <h3>{e(w.get("title"))}</h3>
   <p class="catch">{e(w.get("catch"))}</p>
-  <a class="btn" href="{html.escape(link)}" rel="nofollow sponsored noopener" referrerpolicy="no-referrer-when-downgrade" target="_blank">楽天でチェック</a>
+  <div class="btns">{"".join(btns)}</div>
 </li>'''
 
 
@@ -78,7 +99,8 @@ def build():
         title = "今日の紹介" if n == 0 else f"{int(m)}月{int(d)}日の紹介"
         cards = "\n".join(card(i, w) for i, w in enumerate(rows, 1))
         sections.append(f'<section><h2>{title}</h2><ol class="cards">{cards}</ol></section>')
-    px = pixel(CONFIG["rakuten"])
+    pixels = "".join(f'<img src="{html.escape(pixel(p))}" width="1" height="1" style="border:none" alt="" loading="lazy">'
+                     for p in PROGRAMS.values() if p)
     page = f'''<!doctype html>
 <html lang="ja">
 <head>
@@ -106,6 +128,8 @@ h2{{font-size:18px;background:var(--accent);border:3px solid var(--ink);border-r
 .catch{{margin:0 0 12px;font-size:14px;color:#333}}
 .btn{{display:block;text-align:center;background:var(--accent);color:var(--ink);font-weight:900;border:3px solid var(--ink);border-radius:999px;padding:12px;text-decoration:none;min-height:44px}}
 .btn:active{{transform:translate(2px,2px)}}
+.btns{{display:grid;gap:8px}}
+.btn.sub{{background:#fff}}
 footer{{text-align:center;color:#fff;font-size:12px;padding:24px 16px}}
 </style>
 </head>
@@ -116,7 +140,7 @@ footer{{text-align:center;color:#fff;font-size:12px;padding:24px 16px}}
 {"".join(sections) or "<p>準備中です</p>"}
 </main>
 <footer>@manga45102026</footer>
-<img src="{html.escape(px)}" width="1" height="1" style="border:none" alt="" loading="lazy">
+{pixels}
 </body>
 </html>
 '''
