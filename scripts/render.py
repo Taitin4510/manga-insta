@@ -202,9 +202,10 @@ def frame_916(post_img, top_label, bottom_label):
     return img
 
 
-def make_reel(frames, out_path, tmp_dir, sec=4, fade=0.6):
-    """静止画を順番にクロスフェードでつないだ無音のリール動画（H.264 / AAC）を作る"""
+def make_reel(frames, out_path, tmp_dir, sec=4, fade=0.6, seed="bgm"):
+    """静止画を順番にクロスフェードでつなぎ、オリジナルBGMをつけたリール動画（H.264 / AAC）を作る"""
     import subprocess
+    from music import make_bgm
     paths = []
     for n, fr in enumerate(frames):
         p = os.path.join(tmp_dir, f"_reel_{n}.jpg")
@@ -214,7 +215,9 @@ def make_reel(frames, out_path, tmp_dir, sec=4, fade=0.6):
     for p in paths:
         cmd += ["-loop", "1", "-t", str(sec), "-i", p]
     total = sec * len(paths) - fade * (len(paths) - 1)
-    cmd += ["-f", "lavfi", "-t", f"{total:.2f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
+    bgm = os.path.join(tmp_dir, "_bgm.wav")
+    make_bgm(bgm, total, seed)
+    cmd += ["-i", bgm]
     chain, last = [], "[0:v]"
     for k in range(1, len(paths)):
         out = f"[v{k}]"
@@ -225,7 +228,7 @@ def make_reel(frames, out_path, tmp_dir, sec=4, fade=0.6):
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-profile:v", "high",
             "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-shortest", out_path]
     subprocess.run(cmd, check=True)
-    for p in paths:
+    for p in paths + [bgm]:
         os.remove(p)
 
 
@@ -258,7 +261,7 @@ def main(path, force=False):
             os.path.join(out, f"{i}_story.jpg"), "JPEG", quality=92)
         make_reel([frame_916(cover, "今日のおすすめ漫画", "推しポイントは次へ"),
                    frame_916(points, "今日のおすすめ漫画", "続きはプロフのリンクから")],
-                  os.path.join(out, f"{i}_reel.mp4"), out)
+                  os.path.join(out, f"{i}_reel.mp4"), out, seed=f"{day}-{i}")
     print(f"{day}: {len(works)}作品ぶんの画像を作成")
 
 
