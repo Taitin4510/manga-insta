@@ -160,7 +160,11 @@ def main():
     log = load_log(log_path)
     only = [k.strip() for k in os.environ.get("ONLY_KINDS", "").split(",") if k.strip() in KINDS]
     kinds = only or list(KINDS)
-    todo = [i for i in range(1, len(works) + 1) if any(i not in log[k] for k in kinds)]
+    max_items = int(os.environ.get("MAX_ITEMS", "5"))   # 1日に紹介する件数（アカウントを慣らす間は少なめ）
+    max_reels = int(os.environ.get("MAX_REELS", "2"))   # 1日のリール本数
+    if len(log["reel"]) >= max_reels and "reel" in kinds and not only:
+        kinds.remove("reel")
+    todo = [i for i in range(1, min(len(works), max_items) + 1) if any(i not in log[k] for k in kinds)]
     if not todo:
         print("今日のぶんは全部投稿ずみ")
         return
